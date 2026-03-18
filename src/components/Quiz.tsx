@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import ProgressBar from './ProgressBar';
+import { Heart } from 'lucide-react';
 
 type Question = {
   id: string; // uuid
@@ -58,6 +59,7 @@ export default function Quiz() {
   const [score, setScore] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<'A' | 'B' | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lives, setLives] = useState(5);
 
   // settings
   const [pointsPerQuestion, setPointsPerQuestion] = useState(1);
@@ -118,13 +120,17 @@ export default function Quiz() {
     if (isCorrect) {
       currentScore = score + pointsPerQuestion;
       setScore(currentScore);
+    } else {
+      setLives(prev => Math.max(0, prev - 1));
     }
 
     // Wait exactly 1 second for automatic progression
     setTimeout(async () => {
-      if (currentIndex < questions.length - 1) {
+      const willSurvive = isCorrect || lives > 1;
+      
+      if (currentIndex < questions.length - 1 && willSurvive) {
         setSelectedAnswer(null);
-        setCurrentIndex(i => i + 1);
+        setCurrentIndex((i: number) => i + 1);
       } else {
         // Quiz finished, check auth, save score, and update gamification profile
         try {
@@ -190,7 +196,8 @@ export default function Quiz() {
         }
 
         // Navigate to result
-        router.push(`/result?score=${currentScore}&total=${questions.length * pointsPerQuestion}`);
+        const failedParam = !willSurvive ? '&failed=true' : '';
+        router.push(`/result?score=${currentScore}&total=${questions.length * pointsPerQuestion}${failedParam}`);
       }
     }, 1000);
   };
@@ -262,7 +269,20 @@ export default function Quiz() {
         <div className="mb-10 animate-fade-in-down">
           <div className="flex justify-between items-center mb-4 text-[#afafaf] font-bold">
             <span className="text-xl uppercase tracking-wider">Soru {currentIndex + 1} / {questions.length}</span>
-            <span className="text-xl uppercase tracking-wider">Puan: <span className="text-[#ffc800]">{score}</span></span>
+            <div className="flex items-center gap-4">
+              <div className="flex gap-1">
+                {[...Array(5)].map((_, i) => (
+                  <Heart 
+                    key={i} 
+                    size={28} 
+                    fill={i < lives ? "#ff4b4b" : "none"} 
+                    className={i < lives ? "text-[#ff4b4b]" : "text-gray-200"} 
+                    strokeWidth={i < lives ? 0 : 3} 
+                  />
+                ))}
+              </div>
+              <span className="text-xl uppercase tracking-wider ml-2">Puan: <span className="text-[#ffc800]">{score}</span></span>
+            </div>
           </div>
           <ProgressBar current={displayedProgress} total={questions.length} />
         </div>
